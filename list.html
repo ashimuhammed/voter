@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter List Categorization</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .upload-section {
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #2980b9;
+            background-color: #e8f4fc;
+        }
+
+        .upload-section h2 {
+            color: #3498db;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            margin: 20px 0;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .btn {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-download {
+            background-color: #27ae60;
+            margin-left: 10px;
+        }
+
+        .btn-download:hover {
+            background-color: #219653;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .party-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .party-tab {
+            padding: 10px 20px;
+            background-color: #ecf0f1;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .party-tab.active {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .party-content {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .party-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .count {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .instructions {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .instructions h3 {
+            color: #ff9800;
+            margin-bottom: 10px;
+        }
+
+        .instructions ul {
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        .debug-info {
+            background-color: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .upload-section {
+                padding: 20px;
+            }
+            
+            th, td {
+                padding: 8px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Voter List Categorization System</h1>
+        
+        <div class="instructions">
+            <h3>How to use:</h3>
+            <ul>
+                <li>Upload your Excel voter list file</li>
+                <li>The system will automatically categorize voters by political party</li>
+                <li>View results by clicking on party tabs</li>
+                <li>Download categorized lists as Excel files</li>
+            </ul>
+        </div>
+
+        <div class="debug-info">
+            <h3>Important: Read This First</h3>
+            <p>If voters are going to "Others" category, please check your Excel file structure.</p>
+            <p>The system looks for party information in these columns (in order):</p>
+            <ol>
+                <li><strong>Party</strong> (direct party column)</li>
+                <li><strong>Remarks</strong> (text that might contain party info)</li>
+                <li><strong>Category</strong> (any column with category information)</li>
+                <li><strong>Status</strong> (any column with status information)</li>
+            </ol>
+            <p>Make sure your Excel file has one of these columns with UDF, LDF, SDPI, etc.</p>
+        </div>
+
+        <div class="upload-section">
+            <h2>Upload Voter List Excel File</h2>
+            <input type="file" id="fileInput" accept=".xlsx, .xls" class="file-input">
+            <button class="btn" onclick="processFile()">Process Voter List</button>
+        </div>
+
+        <div id="resultsSection" class="results-section" style="display: none;">
+            <h2>Categorized Voter Lists</h2>
+            
+            <div class="stats" id="statsContainer">
+                <!-- Statistics will be populated here -->
+            </div>
+
+            <div class="party-tabs" id="partyTabs">
+                <!-- Party tabs will be generated here -->
+            </div>
+
+            <div id="partyContents">
+                <!-- Party content will be generated here -->
+            </div>
+
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn btn-download" onclick="downloadAllParties()">Download All Party Lists</button>
+                <button class="btn" onclick="showColumnNames()" style="background-color: #f39c12;">Debug: Show Column Names</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let categorizedData = {};
+        let allColumnNames = [];
+
+        function processFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select an Excel file first.');
+                return;
+            }
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Assuming the first sheet contains the voter data
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Convert to JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    // Store all column names for debugging
+                    if (jsonData.length > 0) {
+                        allColumnNames = Object.keys(jsonData[0]);
+                    }
+                    
+                    // Categorize the data
+                    categorizeVoters(jsonData);
+                    
+                    // Display results
+                    displayResults();
+                    
+                } catch (error) {
+                    console.error('Error processing file:', error);
+                    alert('Error processing the file. Please make sure it is a valid Excel file.');
+                }
+            };
+            
+            reader.onerror = function() {
+                alert('Error reading the file.');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function categorizeVoters(voterData) {
+            // Reset categorized data
+            categorizedData = {
+                'UDF': [],
+                'LDF': [],
+                'SDPI': [],
+                'NEUTRAL': [],
+                'MI': [],
+                'MO': [],
+                'ABORAD': [],
+                'Others': []
+            };
+            
+            voterData.forEach(voter => {
+                let party = 'Others'; // Default category
+                let found = false;
+                
+                // Method 1: Check for direct party column (case insensitive)
+                for (let key in voter) {
+                    if (key.toLowerCase().includes('party')) {
+                        const partyValue = String(voter[key]).toUpperCase().trim();
+                        party = getPartyFromValue(partyValue);
+                        if (party !== 'Others') {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Method 2: Check remarks column if party not found
+                if (!found) {
+                    for (let key in voter) {
+                        if (key.toLowerCase().includes('remark') || 
+                            key.toLowerCase().includes('category') || 
+                            key.toLowerCase().includes('status')) {
+                            const remarksValue = String(voter[key]).toUpperCase().trim();
+                            party = getPartyFromValue(remarksValue);
+                            if (party !== 'Others') {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Method 3: Check all columns for party keywords
+                if (!found) {
+                    for (let key in voter) {
+                        const cellValue = String(voter[key]).toUpperCase().trim();
+                        party = getPartyFromValue(cellValue);
+                        if (party !== 'Others') {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                
+                categorizedData[party].push(voter);
+            });
+        }
+
+        function getPartyFromValue(value) {
+            if (!value || value === '') return 'Others';
+            
+            // Remove extra spaces and make consistent
+            value = value.replace(/\s+/g, ' ').trim();
+            
+            // Exact matches first
+            if (value === 'UDF') return 'UDF';
+            if (value === 'LDF') return 'LDF';
+            if (value === 'SDPI') return 'SDPI';
+            if (value === 'NEUTRAL' || value === 'UNDECIDED' || value === 'NEUTRAL VOTER') return 'NEUTRAL';
+            if (value === 'MI') return 'MI';
+            if (value === 'MO') return 'MO';
+            if (value === 'ABORAD') return 'ABORAD';
+            
+            // Partial matches
+            if (value.includes('UDF')) return 'UDF';
+            if (value.includes('LDF')) return 'LDF';
+            if (value.includes('SDPI')) return 'SDPI';
+            if (value.includes('NEUTRAL') || value.includes('UNDECIDED')) return 'NEUTRAL';
+            if (value.includes(' MI ') || value === 'MI' || value.endsWith(' MI') || value.startsWith('MI ')) return 'MI';
+            if (value.includes(' MO ') || value === 'MO' || value.endsWith(' MO') || value.startsWith('MO ')) return 'MO';
+            if (value.includes('ABORAD')) return 'ABORAD';
+            
+            return 'Others';
+        }
+
+        function displayResults() {
+            const resultsSection = document.getElementById('resultsSection');
+            const statsContainer = document.getElementById('statsContainer');
+            const partyTabs = document.getElementById('partyTabs');
+            const partyContents = document.getElementById('partyContents');
+            
+            // Clear previous content
+            statsContainer.innerHTML = '';
+            partyTabs.innerHTML = '';
+            partyContents.innerHTML = '';
+            
+            // Calculate statistics
+            const parties = Object.keys(categorizedData);
+            const totalVoters = Object.values(categorizedData).reduce((sum, party) => sum + party.length, 0);
+            
+            // Display statistics
+            parties.forEach(party => {
+                const count = categorizedData[party].length;
+                const percentage = totalVoters > 0 ? ((count / totalVoters) * 100).toFixed(1) : '0';
+                
+                const statCard = document.createElement('div');
+                statCard.className = 'stat-card';
+                statCard.innerHTML = `
+                    <h3>${party}</h3>
+                    <div class="count">${count}</div>
+                    <div>${percentage}%</div>
+                `;
+                
+                statsContainer.appendChild(statCard);
+            });
+            
+            // Add total voters stat
+            const totalStatCard = document.createElement('div');
+            totalStatCard.className = 'stat-card';
+            totalStatCard.innerHTML = `
+                <h3>Total Voters</h3>
+                <div class="count">${totalVoters}</div>
+                <div>100%</div>
+            `;
+            statsContainer.appendChild(totalStatCard);
+            
+            // Create party tabs and content
+            parties.forEach((party, index) => {
+                // Skip if no voters in this category
+                if (categorizedData[party].length === 0) return;
+                
+                // Create tab
+                const tab = document.createElement('button');
+                tab.className = `party-tab ${index === 0 ? 'active' : ''}`;
+                tab.textContent = `${party} (${categorizedData[party].length})`;
+                tab.onclick = () => switchPartyTab(party);
+                
+                partyTabs.appendChild(tab);
+                
+                // Create content
+                const content = document.createElement('div');
+                content.className = `party-content ${index === 0 ? 'active' : ''}`;
+                content.id = `content-${party}`;
+                
+                // Create table for this party's voters
+                if (categorizedData[party].length > 0) {
+                    const table = document.createElement('table');
+                    
+                    // Create table header
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    
+                    // Get column names from first voter
+                    const columns = Object.keys(categorizedData[party][0]);
+                    
+                    columns.forEach(column => {
+                        const th = document.createElement('th');
+                        th.textContent = column;
+                        headerRow.appendChild(th);
+                    });
+                    
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+                    
+                    // Create table body
+                    const tbody = document.createElement('tbody');
+                    
+                    categorizedData[party].forEach(voter => {
+                        const row = document.createElement('tr');
+                        
+                        columns.forEach(column => {
+                            const td = document.createElement('td');
+                            td.textContent = voter[column] || '';
+                            row.appendChild(td);
+                        });
+                        
+                        tbody.appendChild(row);
+                    });
+                    
+                    table.appendChild(tbody);
+                    content.appendChild(table);
+                } else {
+                    content.innerHTML = '<p>No voters found for this party.</p>';
+                }
+                
+                partyContents.appendChild(content);
+            });
+            
+            // Show results section
+            resultsSection.style.display = 'block';
+        }
+
+        function switchPartyTab(party) {
+            // Remove active class from all tabs and contents
+            document.querySelectorAll('.party-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.party-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Add active class to selected tab and content
+            document.querySelectorAll('.party-tab').forEach(tab => {
+                if (tab.textContent.includes(party)) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            document.getElementById(`content-${party}`).classList.add('active');
+        }
+
+        function downloadAllParties() {
+            // Create a new workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Add a sheet for each party
+            Object.keys(categorizedData).forEach(party => {
+                if (categorizedData[party].length > 0) {
+                    const ws = XLSX.utils.json_to_sheet(categorizedData[party]);
+                    XLSX.utils.book_append_sheet(wb, ws, party);
+                }
+            });
+            
+            // Download the file
+            XLSX.writeFile(wb, 'Categorized_Voter_List.xlsx');
+        }
+
+        function showColumnNames() {
+            if (allColumnNames.length > 0) {
+                alert('Column names in your Excel file:\n\n' + allColumnNames.join('\n'));
+            } else {
+                alert('Please upload an Excel file first to see column names.');
+            }
+        }
+    </script>
+</body>
+</html>

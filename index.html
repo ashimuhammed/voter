@@ -92,6 +92,15 @@
             background-color: #219653;
         }
 
+        .btn-search {
+            background-color: #9b59b6;
+            margin-left: 10px;
+        }
+
+        .btn-search:hover {
+            background-color: #8e44ad;
+        }
+
         .results-section {
             margin-top: 30px;
         }
@@ -126,10 +135,48 @@
             display: block;
         }
 
+        .search-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .search-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .search-highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            display: block;
         }
 
         th, td {
@@ -220,6 +267,14 @@
             th, td {
                 padding: 8px 10px;
             }
+            
+            .search-box {
+                flex-direction: column;
+            }
+            
+            .search-input {
+                min-width: 100%;
+            }
         }
     </style>
 </head>
@@ -233,22 +288,11 @@
                 <li>Upload your Excel voter list file</li>
                 <li>The system will automatically categorize voters by political party</li>
                 <li>View results by clicking on party tabs</li>
+                <li>Search for specific voters using the search box in each tab</li>
                 <li>Download categorized lists as Excel files</li>
             </ul>
         </div>
 
-        <div class="debug-info">
-            <h3>Important: Read This First</h3>
-            <p>If voters are going to "Others" category, please check your Excel file structure.</p>
-            <p>The system looks for party information in these columns (in order):</p>
-            <ol>
-                <li><strong>Party</strong> (direct party column)</li>
-                <li><strong>Remarks</strong> (text that might contain party info)</li>
-                <li><strong>Category</strong> (any column with category information)</li>
-                <li><strong>Status</strong> (any column with status information)</li>
-            </ol>
-            <p>Make sure your Excel file has one of these columns with UDF, LDF, SDPI, etc.</p>
-        </div>
 
         <div class="upload-section">
             <h2>Upload Voter List Excel File</h2>
@@ -281,6 +325,7 @@
     <script>
         let categorizedData = {};
         let allColumnNames = [];
+        let originalVoterData = [];
 
         function processFile() {
             const fileInput = document.getElementById('fileInput');
@@ -304,6 +349,7 @@
                     
                     // Convert to JSON
                     const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    originalVoterData = jsonData; // Store original data for search
                     
                     // Store all column names for debugging
                     if (jsonData.length > 0) {
@@ -458,6 +504,84 @@
             `;
             statsContainer.appendChild(totalStatCard);
             
+            // Create "All Voters" tab first
+            const allTab = document.createElement('button');
+            allTab.className = 'party-tab active';
+            allTab.textContent = `All Voters (${totalVoters})`;
+            allTab.onclick = () => switchPartyTab('all');
+            partyTabs.appendChild(allTab);
+            
+            // Create "All Voters" content
+            const allContent = document.createElement('div');
+            allContent.className = 'party-content active';
+            allContent.id = 'content-all';
+            
+            // Create search section for All Voters
+            const allSearchSection = document.createElement('div');
+            allSearchSection.className = 'search-section';
+            allSearchSection.innerHTML = `
+                <h3>Search in All Voters</h3>
+                <div class="search-box">
+                    <input type="text" id="search-all" placeholder="Search by name, voter ID, address..." class="search-input">
+                    <button class="btn btn-search" onclick="searchInAllVoters()">Search</button>
+                    <button class="btn" onclick="clearSearch('all')">Clear</button>
+                </div>
+                <div class="search-info" id="search-info-all"></div>
+            `;
+            allContent.appendChild(allSearchSection);
+            
+            // Create table for All Voters
+            const allTable = document.createElement('table');
+            allTable.id = 'table-all';
+            
+            // Create table header
+            const allThead = document.createElement('thead');
+            const allHeaderRow = document.createElement('tr');
+            
+            // Get column names from first voter
+            const columns = allColumnNames.length > 0 ? allColumnNames : Object.keys(originalVoterData[0] || {});
+            
+            // Add Party column to show which party the voter belongs to
+            const allColumns = ['Party', ...columns];
+            
+            allColumns.forEach(column => {
+                const th = document.createElement('th');
+                th.textContent = column;
+                allHeaderRow.appendChild(th);
+            });
+            
+            allThead.appendChild(allHeaderRow);
+            allTable.appendChild(allThead);
+            
+            // Create table body
+            const allTbody = document.createElement('tbody');
+            allTbody.id = 'tbody-all';
+            
+            // Add all voters to the All Voters table
+            Object.keys(categorizedData).forEach(party => {
+                categorizedData[party].forEach(voter => {
+                    const row = document.createElement('tr');
+                    
+                    // Add party cell
+                    const partyCell = document.createElement('td');
+                    partyCell.textContent = party;
+                    row.appendChild(partyCell);
+                    
+                    // Add other columns
+                    columns.forEach(column => {
+                        const td = document.createElement('td');
+                        td.textContent = voter[column] || '';
+                        row.appendChild(td);
+                    });
+                    
+                    allTbody.appendChild(row);
+                });
+            });
+            
+            allTable.appendChild(allTbody);
+            allContent.appendChild(allTable);
+            partyContents.appendChild(allContent);
+            
             // Create party tabs and content
             parties.forEach((party, index) => {
                 // Skip if no voters in this category
@@ -465,7 +589,7 @@
                 
                 // Create tab
                 const tab = document.createElement('button');
-                tab.className = `party-tab ${index === 0 ? 'active' : ''}`;
+                tab.className = `party-tab ${index === 0 ? '' : ''}`;
                 tab.textContent = `${party} (${categorizedData[party].length})`;
                 tab.onclick = () => switchPartyTab(party);
                 
@@ -473,19 +597,31 @@
                 
                 // Create content
                 const content = document.createElement('div');
-                content.className = `party-content ${index === 0 ? 'active' : ''}`;
+                content.className = `party-content`;
                 content.id = `content-${party}`;
+                
+                // Create search section for this party
+                const searchSection = document.createElement('div');
+                searchSection.className = 'search-section';
+                searchSection.innerHTML = `
+                    <h3>Search in ${party} Voters</h3>
+                    <div class="search-box">
+                        <input type="text" id="search-${party}" placeholder="Search by name, ID, address..." class="search-input">
+                        <button class="btn btn-search" onclick="searchInParty('${party}')">Search</button>
+                        <button class="btn" onclick="clearSearch('${party}')">Clear</button>
+                    </div>
+                    <div class="search-info" id="search-info-${party}"></div>
+                `;
+                content.appendChild(searchSection);
                 
                 // Create table for this party's voters
                 if (categorizedData[party].length > 0) {
                     const table = document.createElement('table');
+                    table.id = `table-${party}`;
                     
                     // Create table header
                     const thead = document.createElement('thead');
                     const headerRow = document.createElement('tr');
-                    
-                    // Get column names from first voter
-                    const columns = Object.keys(categorizedData[party][0]);
                     
                     columns.forEach(column => {
                         const th = document.createElement('th');
@@ -498,6 +634,7 @@
                     
                     // Create table body
                     const tbody = document.createElement('tbody');
+                    tbody.id = `tbody-${party}`;
                     
                     categorizedData[party].forEach(voter => {
                         const row = document.createElement('tr');
@@ -542,6 +679,110 @@
             });
             
             document.getElementById(`content-${party}`).classList.add('active');
+        }
+
+        function searchInParty(party) {
+            const searchTerm = document.getElementById(`search-${party}`).value.toLowerCase().trim();
+            const tbody = document.getElementById(`tbody-${party}`);
+            const rows = tbody.getElementsByTagName('tr');
+            const searchInfo = document.getElementById(`search-info-${party}`);
+            
+            let matchCount = 0;
+            
+            for (let row of rows) {
+                let found = false;
+                const cells = row.getElementsByTagName('td');
+                
+                // Remove previous highlights
+                for (let cell of cells) {
+                    cell.innerHTML = cell.textContent;
+                }
+                
+                // Search in each cell
+                for (let cell of cells) {
+                    const cellText = cell.textContent.toLowerCase();
+                    if (cellText.includes(searchTerm)) {
+                        found = true;
+                        // Highlight the matching text
+                        const regex = new RegExp(`(${searchTerm})`, 'gi');
+                        cell.innerHTML = cell.textContent.replace(regex, '<span class="search-highlight">$1</span>');
+                    }
+                }
+                
+                // Show/hide row based on search result
+                if (found) {
+                    row.style.display = '';
+                    matchCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+            
+            // Update search info
+            if (searchTerm) {
+                searchInfo.textContent = `Found ${matchCount} voters matching "${searchTerm}" in ${party}`;
+                searchInfo.style.color = matchCount > 0 ? '#27ae60' : '#e74c3c';
+            } else {
+                searchInfo.textContent = '';
+            }
+        }
+
+        function searchInAllVoters() {
+            const searchTerm = document.getElementById('search-all').value.toLowerCase().trim();
+            const tbody = document.getElementById('tbody-all');
+            const rows = tbody.getElementsByTagName('tr');
+            const searchInfo = document.getElementById('search-info-all');
+            
+            let matchCount = 0;
+            
+            for (let row of rows) {
+                let found = false;
+                const cells = row.getElementsByTagName('td');
+                
+                // Remove previous highlights
+                for (let cell of cells) {
+                    cell.innerHTML = cell.textContent;
+                }
+                
+                // Search in each cell
+                for (let cell of cells) {
+                    const cellText = cell.textContent.toLowerCase();
+                    if (cellText.includes(searchTerm)) {
+                        found = true;
+                        // Highlight the matching text
+                        const regex = new RegExp(`(${searchTerm})`, 'gi');
+                        cell.innerHTML = cell.textContent.replace(regex, '<span class="search-highlight">$1</span>');
+                    }
+                }
+                
+                // Show/hide row based on search result
+                if (found) {
+                    row.style.display = '';
+                    matchCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+            
+            // Update search info
+            if (searchTerm) {
+                searchInfo.textContent = `Found ${matchCount} voters matching "${searchTerm}" across all parties`;
+                searchInfo.style.color = matchCount > 0 ? '#27ae60' : '#e74c3c';
+            } else {
+                searchInfo.textContent = '';
+            }
+        }
+
+        function clearSearch(type) {
+            if (type === 'all') {
+                document.getElementById('search-all').value = '';
+                document.getElementById('search-info-all').textContent = '';
+                searchInAllVoters(); // This will reset the table
+            } else {
+                document.getElementById(`search-${type}`).value = '';
+                document.getElementById(`search-info-${type}`).textContent = '';
+                searchInParty(type); // This will reset the table
+            }
         }
 
         function downloadAllParties() {
